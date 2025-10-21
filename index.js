@@ -383,6 +383,209 @@ bot.on('callback_query', (query) => {
 });
 
 // ========================================
+// 🎨 NOTIFICATIONS PERSONNALISÉES
+// ========================================
+
+// URLs d'images/GIFs pour chaque activité (exemples)
+const MEDIA = {
+  sport: 'https://media.giphy.com/media/3o7TKF1fSIs1R19B8k/giphy.gif',
+  quran: 'https://example.com/quran-beautiful.jpg',
+  khassida: 'https://example.com/islamic-calligraphy.jpg',
+  motivation: 'https://media.giphy.com/media/26FPy3QZQqGtDcrja/giphy.gif'
+};
+
+// Messages motivants variés
+const MESSAGES_MOTIVATION = [
+  "💪 Qu'Allah facilite !",
+  "🔥 Tu es sur la bonne voie !",
+  "✨ Chaque effort compte !",
+  "🌟 Bismillah, courage !",
+  "💎 La constance mène au succès !"
+];
+
+function getMessageMotivation() {
+  return MESSAGES_MOTIVATION[Math.floor(Math.random() * MESSAGES_MOTIVATION.length)];
+}
+
+// Fonction d'émoji selon l'heure
+function getEmojiHeure() {
+  const heure = new Date().getHours();
+  if (heure < 6) return '🌙';
+  if (heure < 12) return '☀️';
+  if (heure < 18) return '🌤️';
+  return '🌆';
+}
+
+// ========================================
+// NOTIFICATION 10 MINUTES AVANT (Améliorée)
+// ========================================
+EDT.forEach(activite => {
+  const [h, m] = activite.heureDebut.split(':').map(Number);
+  const minutesAvant = m - 10;
+  const heureAvant = minutesAvant < 0 ? h - 1 : h;
+  const minAvant = minutesAvant < 0 ? 60 + minutesAvant : minutesAvant;
+  
+  cron.schedule(`${minAvant} ${heureAvant} * * *`, () => {
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
+    
+    const message = `
+${getEmojiHeure()} *PRÉPARATION - DANS 10 MINUTES*
+
+${activite.emoji} *${activite.nom}*
+📝 ${activite.description}
+
+📊 Progression du jour : ${stats.faites}/${stats.total}
+${"🟩".repeat(stats.faites)}${"⬜".repeat(stats.total - stats.faites)}
+
+🔔 Prépare-toi ! ${getMessageMotivation()}
+    `.trim();
+    
+    bot.sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
+  });
+  
+  // ========================================
+  // NOTIFICATION AU DÉBUT (Avec image/GIF selon l'activité)
+  // ========================================
+  cron.schedule(`${m} ${h} * * *`, () => {
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
+    
+    const caption = `
+⚡⚡⚡ *C'EST L'HEURE !* ⚡⚡⚡
+
+${activite.emoji} *${activite.nom}*
+⏰ ${activite.heureDebut} - ${activite.heureFin}
+
+📊 ${stats.faites}/${stats.total} aujourd'hui
+${stats.pourcentage >= 70 ? '🔥' : stats.pourcentage >= 50 ? '💪' : '🌱'} ${stats.pourcentage}% complétées
+
+✨ Bismillah, c'est parti !
+    `.trim();
+    
+    // Envoyer avec GIF pour le sport
+    if (activite.id === 2) { // Sport
+      bot.sendAnimation(CHAT_ID, MEDIA.sport, {
+        caption: caption,
+        parse_mode: 'Markdown',
+        reply_markup: creerBoutonsActivite(activite.id)
+      });
+    }
+    // Envoyer avec image pour les activités spirituelles
+    else if ([3, 4, 5].includes(activite.id)) { // Diang, Sarr, Khassida
+      // Si tu veux une image, décommente la ligne suivante
+      // bot.sendPhoto(CHAT_ID, MEDIA.quran, { ... });
+      
+      // Sinon, message simple avec beaucoup d'émojis
+      bot.sendMessage(CHAT_ID, caption, {
+        parse_mode: 'Markdown',
+        reply_markup: creerBoutonsActivite(activite.id)
+      });
+    }
+    // Message simple pour les autres
+    else {
+      bot.sendMessage(CHAT_ID, caption, {
+        parse_mode: 'Markdown',
+        reply_markup: creerBoutonsActivite(activite.id)
+      });
+    }
+  });
+  
+  // ========================================
+  // NOTIFICATION À LA FIN (Avec encouragement)
+  // ========================================
+  const [hFin, mFin] = activite.heureFin.split(':').map(Number);
+  cron.schedule(`${mFin} ${hFin} * * *`, () => {
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
+    const prochaine = prochaineActivite();
+    
+    // Message différent si l'activité a été validée ou non
+    const estValidee = stats.completes.includes(activite.id);
+    
+    let message = estValidee 
+      ? `✅ *BRAVO !*\n\n${activite.emoji} ${activite.nom} terminé !\n\n`
+      : `⏱️ *TEMPS ÉCOULÉ*\n\n${activite.emoji} ${activite.nom}\n\n`;
+    
+    if (prochaine) {
+      message += `➡️ *Prochaine activité :*\n${prochaine.emoji} ${prochaine.nom}\n⏰ Dans ${calculerTempsAvant(prochaine)} min`;
+    } else {
+      message += `🌙 C'était la dernière activité.\n\n📊 Tape /stats pour ton bilan !`;
+    }
+    
+    // Ajouter stats de la journée
+    message += `\n\n📊 Bilan du jour : ${stats.faites}/${stats.total} (${stats.pourcentage}%)`;
+    
+    if (stats.pourcentage >= 80) {
+      message += '\n\n🔥 *Excellent travail !* MashAllah !';
+    } else if (stats.pourcentage >= 50) {
+      message += '\n\n💪 *Bien joué !* Continue !';
+    }
+    
+    bot.sendMessage(CHAT_ID, message, {
+      parse_mode: 'Markdown',
+      reply_markup: estValidee ? creerBoutonsCommandes() : creerBoutonsActivite(activite.id)
+    });
+  });
+});
+
+// Fonction helper pour calculer le temps avant une activité
+function calculerTempsAvant(activite) {
+  const now = maintenant();
+  const debut = heureEnMinutes(activite.heureDebut);
+  return debut - now;
+}
+
+// ========================================
+// NOTIFICATION SPÉCIALE : Milieu de journée
+// ========================================
+cron.schedule('0 13 * * *', () => {
+  initialiserJour();
+  const aujourdhui = new Date().toISOString().split('T')[0];
+  const stats = calculerStatsJour(aujourdhui);
+  
+  if (stats.faites === 0) {
+    bot.sendMessage(CHAT_ID, 
+      `🌤️ *Petit rappel de midi*\n\nTu n'as pas encore validé d'activités aujourd'hui.\n\n💪 Ce n'est pas grave ! La journée n'est pas finie.\n\n✨ ${getMessageMotivation()}`,
+      { parse_mode: 'Markdown', reply_markup: creerBoutonsCommandes() }
+    );
+  } else if (stats.pourcentage >= 80) {
+    bot.sendMessage(CHAT_ID, 
+      `🔥 *Tu cartonne aujourd'hui !*\n\n${stats.faites}/${stats.total} activités validées (${stats.pourcentage}%)\n\n🌟 Continue comme ça !`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+});
+
+// ========================================
+// NOTIFICATION : Encouragement du soir (22h)
+// ========================================
+cron.schedule('0 22 * * *', () => {
+  initialiserJour();
+  const aujourdhui = new Date().toISOString().split('T')[0];
+  const stats = calculerStatsJour(aujourdhui);
+  
+  let message = '🌙 *Bonsoir Saliou*\n\n';
+  
+  if (stats.pourcentage >= 80) {
+    message += `🔥 *Journée exceptionnelle !*\n\n${stats.faites}/${stats.total} activités complétées\n\n🏆 Tu es un champion ! Qu'Allah te récompense !`;
+  } else if (stats.pourcentage >= 50) {
+    message += `💪 *Belle journée !*\n\n${stats.faites}/${stats.total} activités complétées\n\n✨ Continue comme ça demain insha'Allah !`;
+  } else {
+    message += `🌱 *Chaque effort compte*\n\n${stats.faites}/${stats.total} activités aujourd'hui\n\n💎 Demain sera meilleur insha'Allah !\n\nLa constance est la clé.`;
+  }
+  
+  message += '\n\n📊 Tape /stats pour voir le détail complet';
+  
+  bot.sendMessage(CHAT_ID, message, { 
+    parse_mode: 'Markdown',
+    reply_markup: creerBoutonsCommandes()
+  });
+});
+// ========================================
 // ⏰ NOTIFICATIONS PROGRAMMÉES
 // ========================================
 
@@ -531,4 +734,5 @@ console.log('✅ En attente...');
 bot.sendMessage(CHAT_ID, '✅ *Bot redémarré !*\n\n📊 Système de suivi activé\n🔘 Boutons interactifs prêts\n\n🚀 Je suis prêt !', { 
   parse_mode: 'Markdown',
   reply_markup: creerBoutonsCommandes()
+
 });
