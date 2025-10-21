@@ -5,7 +5,9 @@ const express = require('express');
 // ========================================
 // 🔐 CONFIGURATION
 // ========================================
-const TOKEN = '8280606106:AAGdeWR0Mh9pT-VbhESc0U4zU4i9T1RV4-Q';
+// const TOKEN = '8280606106:AAGdeWR0Mh9pT-VbhESc0U4zU4i9T1RV4-Q';
+const TOKEN = process.env.BOT_TOKEN || '8280606106:AAGdeWR0Mh9pT1U-VbhESc0U4zU4i9T1RV4';
+
 const CHAT_ID = '982047637';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
