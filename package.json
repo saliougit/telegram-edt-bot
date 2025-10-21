@@ -4,11 +4,12 @@
   "description": "Bot Telegram EDT avec suivi et stats",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.64.0",
     "node-cron": "^3.0.3",
     "express": "^4.18.2"
   }
+
 }
