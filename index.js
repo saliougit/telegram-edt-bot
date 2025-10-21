@@ -38,42 +38,26 @@ const EDT = [
   },
   {
     id: 3,
-    nom: "🌙 Sangoou + Dourous + Diang",
-    description: "Révision, apprentissage Quran, écriture ou récitation",
+    nom: "🌙 Séance spirituelle",
+    description: "Sangoou + Dourous + Diang Xam Xam + Sarr Al-Qur'an + Khassida",
     heureDebut: "19:00",
-    heureFin: "20:00",
+    heureFin: "21:00",
     emoji: "🌙"
   },
   {
     id: 4,
-    nom: "📖 Sarr Al-Qur'an",
-    description: "Lecture / mémorisation selon progression",
-    heureDebut: "20:00",
-    heureFin: "21:00",
-    emoji: "📖"
-  },
-  {
-    id: 5,
-    nom: "✨ Khassida",
-    description: "Étude des khassidas de la semaine",
+    nom: "📚 Cours CE2",
+    description: "Cours à l'enfant",
     heureDebut: "21:00",
     heureFin: "22:00",
-    emoji: "✨"
-  },
-  {
-    id: 6,
-    nom: "📚 Cours CE2",
-    description: "Cours à l'enfant, max 22h30",
-    heureDebut: "22:00",
-    heureFin: "22:30",
     emoji: "📚"
   },
   {
-    id: 7,
-    nom: "💻 Travail/Tâches",
-    description: "Tâches ou repos selon planning",
-    heureDebut: "22:30",
-    heureFin: "23:00",
+    id: 5,
+    nom: "💻 Travail/Révisions/Veille",
+    description: "Travail personnel, révisions ou veille technologique",
+    heureDebut: "22:00",
+    heureFin: "00:00",
     emoji: "💻"
   }
 ];
