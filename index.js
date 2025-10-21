@@ -5,17 +5,16 @@ const express = require('express');
 // ========================================
 // 🔐 CONFIGURATION
 // ========================================
-// const TOKEN = '8280606106:AAGdeWR0Mh9pT-VbhESc0U4zU4i9T1RV4-Q';
-const TOKEN = process.env.BOT_TOKEN || '8280606106:AAGdeWR0Mh9pT1U-VbhESc0U4zU4i9T1RV4';
-
+const TOKEN = process.env.BOT_TOKEN || '8280606106:AAGdeWR0Mh9pT-VbhESc0U4zU4i9T1RV4-Q';
 const CHAT_ID = '982047637';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// Express pour garder Glitch actif
+// Express pour Render
 const app = express();
-app.get('/', (req, res) => res.send('Bot actif ! ✅'));
-app.listen(3000);
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('🤖 Bot Telegram actif ! ✅'));
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 
 // ========================================
 // 📅 EMPLOI DU TEMPS
@@ -80,16 +79,14 @@ const EDT = [
 ];
 
 // ========================================
-// 💾 SYSTÈME DE SUIVI (stockage en mémoire)
+// 💾 SYSTÈME DE SUIVI
 // ========================================
 let statistiques = {
   activitesCompletes: {},
   activitesReportees: {},
   activitesAnnulees: {},
-  derniereReinitialisation: new Date().toISOString().split('T')[0]
 };
 
-// Réinitialiser les stats chaque jour à minuit
 cron.schedule('0 0 * * *', () => {
   const aujourdhui = new Date().toISOString().split('T')[0];
   statistiques.activitesCompletes[aujourdhui] = [];
@@ -97,7 +94,6 @@ cron.schedule('0 0 * * *', () => {
   statistiques.activitesAnnulees[aujourdhui] = [];
 });
 
-// Initialiser le jour actuel si nécessaire
 function initialiserJour() {
   const aujourdhui = new Date().toISOString().split('T')[0];
   if (!statistiques.activitesCompletes[aujourdhui]) {
@@ -146,6 +142,12 @@ function formaterEDT() {
     message += `   📝 ${a.description}\n\n`;
   });
   return message;
+}
+
+function calculerTempsAvant(activite) {
+  const now = maintenant();
+  const debut = heureEnMinutes(activite.heureDebut);
+  return debut - now;
 }
 
 // ========================================
@@ -199,7 +201,6 @@ function genererMessageStats() {
   
   let message = "📊 *TES STATISTIQUES* 📊\n\n";
   
-  // Stats du jour
   message += "📅 *Aujourd'hui :*\n";
   message += `✅ ${statsJour.faites}/${statsJour.total} activités complétées (${statsJour.pourcentage}%)\n`;
   if (statsJour.reportees.length > 0) {
@@ -209,23 +210,19 @@ function genererMessageStats() {
     message += `❌ ${statsJour.annulees.length} annulée(s)\n`;
   }
   
-  // Barre de progression
   const barreComplete = Math.floor(statsJour.pourcentage / 10);
   const barreVide = 10 - barreComplete;
   message += `${"🟩".repeat(barreComplete)}${"⬜".repeat(barreVide)} ${statsJour.pourcentage}%\n\n`;
   
-  // Stats de la semaine
   message += "📈 *Cette semaine (7 derniers jours) :*\n";
   message += `✅ ${statsSemaine.totalCompletes}/${statsSemaine.totalActivites} activités (${statsSemaine.pourcentageSemaine}%)\n\n`;
   
-  // Détail par jour
   message += "*Détail :*\n";
   statsSemaine.joursStats.forEach(j => {
     const emoji = j.pourcentage >= 80 ? "🔥" : j.pourcentage >= 50 ? "✅" : "📊";
     message += `${emoji} ${j.jour} : ${j.faites}/${j.total} (${j.pourcentage}%)\n`;
   });
   
-  // Motivation
   if (statsJour.pourcentage >= 80) {
     message += "\n🔥 *Excellent travail !* Continue comme ça !";
   } else if (statsJour.pourcentage >= 50) {
@@ -235,6 +232,33 @@ function genererMessageStats() {
   }
   
   return message;
+}
+
+// ========================================
+// 🎨 PERSONNALISATION
+// ========================================
+const MEDIA = {
+  sport: 'https://media.giphy.com/media/3o7TKF1fSIs1R19B8k/giphy.gif',
+};
+
+const MESSAGES_MOTIVATION = [
+  "💪 Qu'Allah facilite !",
+  "🔥 Tu es sur la bonne voie !",
+  "✨ Chaque effort compte !",
+  "🌟 Bismillah, courage !",
+  "💎 La constance mène au succès !"
+];
+
+function getMessageMotivation() {
+  return MESSAGES_MOTIVATION[Math.floor(Math.random() * MESSAGES_MOTIVATION.length)];
+}
+
+function getEmojiHeure() {
+  const heure = new Date().getHours();
+  if (heure < 6) return '🌙';
+  if (heure < 12) return '☀️';
+  if (heure < 18) return '🌤️';
+  return '🌆';
 }
 
 // ========================================
@@ -270,7 +294,7 @@ function creerBoutonsCommandes() {
 }
 
 // ========================================
-// 📨 GESTION DES CALLBACKS (BOUTONS)
+// 📨 GESTION DES CALLBACKS
 // ========================================
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
@@ -280,7 +304,6 @@ bot.on('callback_query', (query) => {
   initialiserJour();
   const aujourdhui = new Date().toISOString().split('T')[0];
   
-  // Actions sur les activités
   if (data.startsWith('fait_')) {
     const activiteId = parseInt(data.split('_')[1]);
     const activite = EDT.find(a => a.id === activiteId);
@@ -342,7 +365,6 @@ bot.on('callback_query', (query) => {
     bot.answerCallbackQuery(query.id, { text: '❌ Activité annulée' });
   }
   
-  // Commandes rapides
   else if (data === 'cmd_programme') {
     bot.sendMessage(chatId, formaterEDT(), { parse_mode: 'Markdown' });
     bot.answerCallbackQuery(query.id);
@@ -383,165 +405,20 @@ bot.on('callback_query', (query) => {
 });
 
 // ========================================
-// 🎨 NOTIFICATIONS PERSONNALISÉES
+// ⏰ NOTIFICATIONS PROGRAMMÉES
 // ========================================
 
-// URLs d'images/GIFs pour chaque activité (exemples)
-const MEDIA = {
-  sport: 'https://media.giphy.com/media/3o7TKF1fSIs1R19B8k/giphy.gif',
-  quran: 'https://example.com/quran-beautiful.jpg',
-  khassida: 'https://example.com/islamic-calligraphy.jpg',
-  motivation: 'https://media.giphy.com/media/26FPy3QZQqGtDcrja/giphy.gif'
-};
-
-// Messages motivants variés
-const MESSAGES_MOTIVATION = [
-  "💪 Qu'Allah facilite !",
-  "🔥 Tu es sur la bonne voie !",
-  "✨ Chaque effort compte !",
-  "🌟 Bismillah, courage !",
-  "💎 La constance mène au succès !"
-];
-
-function getMessageMotivation() {
-  return MESSAGES_MOTIVATION[Math.floor(Math.random() * MESSAGES_MOTIVATION.length)];
-}
-
-// Fonction d'émoji selon l'heure
-function getEmojiHeure() {
-  const heure = new Date().getHours();
-  if (heure < 6) return '🌙';
-  if (heure < 12) return '☀️';
-  if (heure < 18) return '🌤️';
-  return '🌆';
-}
-
-// ========================================
-// NOTIFICATION 10 MINUTES AVANT (Améliorée)
-// ========================================
-EDT.forEach(activite => {
-  const [h, m] = activite.heureDebut.split(':').map(Number);
-  const minutesAvant = m - 10;
-  const heureAvant = minutesAvant < 0 ? h - 1 : h;
-  const minAvant = minutesAvant < 0 ? 60 + minutesAvant : minutesAvant;
-  
-  cron.schedule(`${minAvant} ${heureAvant} * * *`, () => {
-    initialiserJour();
-    const aujourdhui = new Date().toISOString().split('T')[0];
-    const stats = calculerStatsJour(aujourdhui);
-    
-    const message = `
-${getEmojiHeure()} *PRÉPARATION - DANS 10 MINUTES*
-
-${activite.emoji} *${activite.nom}*
-📝 ${activite.description}
-
-📊 Progression du jour : ${stats.faites}/${stats.total}
-${"🟩".repeat(stats.faites)}${"⬜".repeat(stats.total - stats.faites)}
-
-🔔 Prépare-toi ! ${getMessageMotivation()}
-    `.trim();
-    
-    bot.sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
-  });
-  
-  // ========================================
-  // NOTIFICATION AU DÉBUT (Avec image/GIF selon l'activité)
-  // ========================================
-  cron.schedule(`${m} ${h} * * *`, () => {
-    initialiserJour();
-    const aujourdhui = new Date().toISOString().split('T')[0];
-    const stats = calculerStatsJour(aujourdhui);
-    
-    const caption = `
-⚡⚡⚡ *C'EST L'HEURE !* ⚡⚡⚡
-
-${activite.emoji} *${activite.nom}*
-⏰ ${activite.heureDebut} - ${activite.heureFin}
-
-📊 ${stats.faites}/${stats.total} aujourd'hui
-${stats.pourcentage >= 70 ? '🔥' : stats.pourcentage >= 50 ? '💪' : '🌱'} ${stats.pourcentage}% complétées
-
-✨ Bismillah, c'est parti !
-    `.trim();
-    
-    // Envoyer avec GIF pour le sport
-    if (activite.id === 2) { // Sport
-      bot.sendAnimation(CHAT_ID, MEDIA.sport, {
-        caption: caption,
-        parse_mode: 'Markdown',
-        reply_markup: creerBoutonsActivite(activite.id)
-      });
-    }
-    // Envoyer avec image pour les activités spirituelles
-    else if ([3, 4, 5].includes(activite.id)) { // Diang, Sarr, Khassida
-      // Si tu veux une image, décommente la ligne suivante
-      // bot.sendPhoto(CHAT_ID, MEDIA.quran, { ... });
-      
-      // Sinon, message simple avec beaucoup d'émojis
-      bot.sendMessage(CHAT_ID, caption, {
-        parse_mode: 'Markdown',
-        reply_markup: creerBoutonsActivite(activite.id)
-      });
-    }
-    // Message simple pour les autres
-    else {
-      bot.sendMessage(CHAT_ID, caption, {
-        parse_mode: 'Markdown',
-        reply_markup: creerBoutonsActivite(activite.id)
-      });
-    }
-  });
-  
-  // ========================================
-  // NOTIFICATION À LA FIN (Avec encouragement)
-  // ========================================
-  const [hFin, mFin] = activite.heureFin.split(':').map(Number);
-  cron.schedule(`${mFin} ${hFin} * * *`, () => {
-    initialiserJour();
-    const aujourdhui = new Date().toISOString().split('T')[0];
-    const stats = calculerStatsJour(aujourdhui);
-    const prochaine = prochaineActivite();
-    
-    // Message différent si l'activité a été validée ou non
-    const estValidee = stats.completes.includes(activite.id);
-    
-    let message = estValidee 
-      ? `✅ *BRAVO !*\n\n${activite.emoji} ${activite.nom} terminé !\n\n`
-      : `⏱️ *TEMPS ÉCOULÉ*\n\n${activite.emoji} ${activite.nom}\n\n`;
-    
-    if (prochaine) {
-      message += `➡️ *Prochaine activité :*\n${prochaine.emoji} ${prochaine.nom}\n⏰ Dans ${calculerTempsAvant(prochaine)} min`;
-    } else {
-      message += `🌙 C'était la dernière activité.\n\n📊 Tape /stats pour ton bilan !`;
-    }
-    
-    // Ajouter stats de la journée
-    message += `\n\n📊 Bilan du jour : ${stats.faites}/${stats.total} (${stats.pourcentage}%)`;
-    
-    if (stats.pourcentage >= 80) {
-      message += '\n\n🔥 *Excellent travail !* MashAllah !';
-    } else if (stats.pourcentage >= 50) {
-      message += '\n\n💪 *Bien joué !* Continue !';
-    }
-    
-    bot.sendMessage(CHAT_ID, message, {
-      parse_mode: 'Markdown',
-      reply_markup: estValidee ? creerBoutonsCommandes() : creerBoutonsActivite(activite.id)
-    });
+// Résumé du matin à 5h00
+cron.schedule('0 5 * * *', () => {
+  initialiserJour();
+  const message = `☀️ *BONJOUR SALIOU !* ☀️\n\n${formaterEDT()}\n💪 Bonne journée remplie de baraka !`;
+  bot.sendMessage(CHAT_ID, message, { 
+    parse_mode: 'Markdown',
+    reply_markup: creerBoutonsCommandes()
   });
 });
 
-// Fonction helper pour calculer le temps avant une activité
-function calculerTempsAvant(activite) {
-  const now = maintenant();
-  const debut = heureEnMinutes(activite.heureDebut);
-  return debut - now;
-}
-
-// ========================================
-// NOTIFICATION SPÉCIALE : Milieu de journée
-// ========================================
+// Rappel de midi (13h)
 cron.schedule('0 13 * * *', () => {
   initialiserJour();
   const aujourdhui = new Date().toISOString().split('T')[0];
@@ -554,15 +431,13 @@ cron.schedule('0 13 * * *', () => {
     );
   } else if (stats.pourcentage >= 80) {
     bot.sendMessage(CHAT_ID, 
-      `🔥 *Tu cartonne aujourd'hui !*\n\n${stats.faites}/${stats.total} activités validées (${stats.pourcentage}%)\n\n🌟 Continue comme ça !`,
+      `🔥 *Tu cartonnes aujourd'hui !*\n\n${stats.faites}/${stats.total} activités validées (${stats.pourcentage}%)\n\n🌟 Continue comme ça !`,
       { parse_mode: 'Markdown' }
     );
   }
 });
 
-// ========================================
-// NOTIFICATION : Encouragement du soir (22h)
-// ========================================
+// Encouragement du soir (22h)
 cron.schedule('0 22 * * *', () => {
   initialiserJour();
   const aujourdhui = new Date().toISOString().split('T')[0];
@@ -585,21 +460,8 @@ cron.schedule('0 22 * * *', () => {
     reply_markup: creerBoutonsCommandes()
   });
 });
-// ========================================
-// ⏰ NOTIFICATIONS PROGRAMMÉES
-// ========================================
 
-// Résumé du matin à 5h00
-cron.schedule('0 5 * * *', () => {
-  initialiserJour();
-  const message = `☀️ *BONJOUR SALIOU !* ☀️\n\n${formaterEDT()}\n💪 Bonne journée remplie de baraka !`;
-  bot.sendMessage(CHAT_ID, message, { 
-    parse_mode: 'Markdown',
-    reply_markup: creerBoutonsCommandes()
-  });
-});
-
-// Bilan du soir à 23h
+// Bilan de fin de journée (23h)
 cron.schedule('0 23 * * *', () => {
   bot.sendMessage(CHAT_ID, genererMessageStats(), { 
     parse_mode: 'Markdown'
@@ -616,40 +478,90 @@ EDT.forEach(activite => {
   const minAvant = minutesAvant < 0 ? 60 + minutesAvant : minutesAvant;
   
   cron.schedule(`${minAvant} ${heureAvant} * * *`, () => {
-    bot.sendMessage(
-      CHAT_ID,
-      `⏰ *DANS 10 MINUTES*\n\n${activite.emoji} ${activite.nom}\n📝 ${activite.description}\n\n🔔 Prépare-toi !`,
-      { parse_mode: 'Markdown' }
-    );
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
+    
+    const message = `
+${getEmojiHeure()} *PRÉPARATION - DANS 10 MINUTES*
+
+${activite.emoji} *${activite.nom}*
+📝 ${activite.description}
+
+📊 Progression : ${stats.faites}/${stats.total}
+${"🟩".repeat(stats.faites)}${"⬜".repeat(stats.total - stats.faites)}
+
+🔔 Prépare-toi ! ${getMessageMotivation()}
+    `.trim();
+    
+    bot.sendMessage(CHAT_ID, message, { parse_mode: 'Markdown' });
   });
   
-  // Au début
+  // Au début de l'activité
   cron.schedule(`${m} ${h} * * *`, () => {
-    bot.sendMessage(
-      CHAT_ID,
-      `▶️ *C'EST L'HEURE !*\n\n${activite.emoji} ${activite.nom}\n📝 ${activite.description}\n\n✨ Bismillah, c'est parti !`,
-      { 
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
+    
+    const caption = `
+⚡⚡⚡ *C'EST L'HEURE !* ⚡⚡⚡
+
+${activite.emoji} *${activite.nom}*
+⏰ ${activite.heureDebut} - ${activite.heureFin}
+
+📊 ${stats.faites}/${stats.total} aujourd'hui
+${stats.pourcentage >= 70 ? '🔥' : stats.pourcentage >= 50 ? '💪' : '🌱'} ${stats.pourcentage}% complétées
+
+✨ Bismillah, c'est parti !
+    `.trim();
+    
+    // GIF pour le sport
+    if (activite.id === 2) {
+      bot.sendAnimation(CHAT_ID, MEDIA.sport, {
+        caption: caption,
         parse_mode: 'Markdown',
         reply_markup: creerBoutonsActivite(activite.id)
-      }
-    );
+      });
+    } else {
+      bot.sendMessage(CHAT_ID, caption, {
+        parse_mode: 'Markdown',
+        reply_markup: creerBoutonsActivite(activite.id)
+      });
+    }
   });
   
-  // À la fin
+  // À la fin de l'activité
   const [hFin, mFin] = activite.heureFin.split(':').map(Number);
   cron.schedule(`${mFin} ${hFin} * * *`, () => {
+    initialiserJour();
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const stats = calculerStatsJour(aujourdhui);
     const prochaine = prochaineActivite();
-    let message = `⏱️ *TEMPS ÉCOULÉ*\n\n${activite.emoji} ${activite.nom}\n\n`;
+    
+    const estValidee = stats.completes.includes(activite.id);
+    
+    let message = estValidee 
+      ? `✅ *BRAVO !*\n\n${activite.emoji} ${activite.nom} terminé !\n\n`
+      : `⏱️ *TEMPS ÉCOULÉ*\n\n${activite.emoji} ${activite.nom}\n\n`;
     
     if (prochaine) {
-      message += `➡️ *Prochaine :* ${prochaine.emoji} ${prochaine.nom}\n⏰ À ${prochaine.heureDebut}`;
+      const tempsAvant = calculerTempsAvant(prochaine);
+      message += `➡️ *Prochaine :* ${prochaine.emoji} ${prochaine.nom}\n⏰ Dans ${tempsAvant} min`;
     } else {
-      message += `🌙 C'était la dernière activité.\n\nTape /stats pour voir ton bilan !`;
+      message += `🌙 C'était la dernière activité.\n\n📊 Tape /stats pour ton bilan !`;
+    }
+    
+    message += `\n\n📊 Aujourd'hui : ${stats.faites}/${stats.total} (${stats.pourcentage}%)`;
+    
+    if (stats.pourcentage >= 80) {
+      message += '\n\n🔥 *Excellent !* MashAllah !';
+    } else if (stats.pourcentage >= 50) {
+      message += '\n\n💪 *Bien joué !* Continue !';
     }
     
     bot.sendMessage(CHAT_ID, message, {
       parse_mode: 'Markdown',
-      reply_markup: creerBoutonsActivite(activite.id)
+      reply_markup: estValidee ? creerBoutonsCommandes() : creerBoutonsActivite(activite.id)
     });
   });
 });
@@ -668,6 +580,8 @@ Je suis ton assistant personnel avec suivi et statistiques !
 • 10 min avant : Préparation
 • Au début : "C'est l'heure !" + boutons
 • À la fin : Temps écoulé + boutons
+• 13h00 : Rappel de midi
+• 22h00 : Encouragement du soir
 • 23h00 : Bilan statistique
 
 📊 *Suivi d'activités :*
@@ -731,8 +645,7 @@ console.log('⏰ Notifications actives');
 console.log('📊 Système de suivi actif');
 console.log('✅ En attente...');
 
-bot.sendMessage(CHAT_ID, '✅ *Bot redémarré !*\n\n📊 Système de suivi activé\n🔘 Boutons interactifs prêts\n\n🚀 Je suis prêt !', { 
+bot.sendMessage(CHAT_ID, '✅ *Bot redémarré !*\n\n📊 Système de suivi activé\n🔘 Boutons interactifs prêts\n🎨 Notifications personnalisées\n\n🚀 Je suis prêt !', { 
   parse_mode: 'Markdown',
   reply_markup: creerBoutonsCommandes()
-
 });
